@@ -63,7 +63,7 @@ final class Loader extends PluginBase{
 					unset($population_queue[$index]);
 					/** @var $generator Generator */
 					if(count($population_queue) === 0 && !$generator->valid()){
-						break;
+						return;
 					}
 				}
 			}
@@ -71,7 +71,7 @@ final class Loader extends PluginBase{
 			while($iterated !== $iterations && $loaded_chunks < $population_queue_size){
 				$generator->send(true);
 				if(!$generator->valid() && count($population_queue) === 0){
-					break;
+					return;
 				}
 
 				$logger->info("Completed {$iterated} / {$iterations} chunks (" . sprintf("%0.2f", ($iterated / $iterations) * 100) . "%, {$loaded_chunks} chunks are currently being populated)");
