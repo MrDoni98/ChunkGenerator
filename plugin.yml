@@ -1,6 +1,6 @@
 name: ChunkGenerator
 main: muqsit\chunkgenerator\Loader
-api: 4.0.0
+api: 3.17.0
 version: 0.0.1
 commands:
   cgen:

@@ -8,12 +8,19 @@ use Generator;
 use pocketmine\command\Command;
 use pocketmine\command\CommandSender;
 use pocketmine\plugin\PluginBase;
-use pocketmine\scheduler\CancellableClosureTask;
-use pocketmine\world\World;
+use pocketmine\scheduler\ClosureTask;
+use pocketmine\level\Level;
+use pocketmine\utils\TextFormat;
 
 final class Loader extends PluginBase{
 
-	private function generateChunks(World $world, int $minChunkX, int $minChunkZ, int $maxChunkX, int $maxChunkZ, int $population_queue_size) : void{
+	public function onEnable()
+	{
+
+		$this->getServer()->getPluginManager()->registerEvents(new ChunkListener(), $this);
+	}
+
+	private function generateChunks(Level $world, int $minChunkX, int $minChunkZ, int $maxChunkX, int $maxChunkZ, int $population_queue_size) : void{
 		$loaded_chunks = 0;
 		$iterated = 0;
 		$population_queue = [];
@@ -30,18 +37,18 @@ final class Loader extends PluginBase{
 							yield true;
 							continue;
 						}
-						$population_queue[World::chunkHash($chunkX, $chunkZ)] = $chunk;
+						$population_queue[Level::chunkHash($chunkX, $chunkZ)] = $chunk;
 					}
 
-					$generator = new ChunkGenerator($chunkX, $chunkZ, static function(ChunkGenerator $generator) use(&$population_queue) : void{
-						$population_queue[World::chunkHash($generator->getX(), $generator->getZ())] = $generator;
+					$generator = new ChunkGenerator($world, $chunkX, $chunkZ, static function(ChunkGenerator $generator) use(&$population_queue) : void{
+						$population_queue[Level::chunkHash($generator->getX(), $generator->getZ())] = $generator;
 					}, static function(ChunkGenerator $generator) use($world, &$loaded_chunks) : void{
-						$world->unregisterChunkListener($generator, $generator->getX(), $generator->getZ());
+						//$world->unregisterChunkListener($generator, $generator->getX(), $generator->getZ());
 						$world->unregisterChunkLoader($generator, $generator->getX(), $generator->getZ());
 						--$loaded_chunks;
 					});
 
-					$world->registerChunkListener($generator, $chunkX, $chunkZ);
+					//$world->registerChunkListener($generator, $chunkX, $chunkZ);
 					$world->registerChunkLoader($generator, $chunkX, $chunkZ);
 					++$loaded_chunks;
 					yield true;
@@ -50,12 +57,13 @@ final class Loader extends PluginBase{
 		})();
 
 		$iterations = (1 + ($maxChunkX - $minChunkX)) * (1 + ($maxChunkZ - $minChunkZ));
-		$this->getScheduler()->scheduleRepeatingTask(new CancellableClosureTask(static function() use(&$loaded_chunks, &$iterated, &$population_queue, $world, $iterations, $generator, $logger, $population_queue_size) : bool{
+		$this->getScheduler()->scheduleRepeatingTask(new ClosureTask(static function() use(&$loaded_chunks, &$iterated, &$population_queue, $world, $iterations, $generator, $logger, $population_queue_size) : void{
 			foreach($population_queue as $index => $gen){
 				if($world->populateChunk($gen->getX(), $gen->getZ(), true)){
 					unset($population_queue[$index]);
+					/** @var $generator Generator */
 					if(count($population_queue) === 0 && !$generator->valid()){
-						return false;
+						break;
 					}
 				}
 			}
@@ -63,19 +71,19 @@ final class Loader extends PluginBase{
 			while($iterated !== $iterations && $loaded_chunks < $population_queue_size){
 				$generator->send(true);
 				if(!$generator->valid() && count($population_queue) === 0){
-					return false;
+					break;
 				}
 
 				$logger->info("Completed {$iterated} / {$iterations} chunks (" . sprintf("%0.2f", ($iterated / $iterations) * 100) . "%, {$loaded_chunks} chunks are currently being populated)");
 			}
-			return true;
+			return;
 		}), 1);
 	}
 
 	public function onCommand(CommandSender $sender, Command $command, string $label, array $args) : bool{
 		if(isset($args[0])){
 			$world_name = array_shift($args);
-			$world = $this->getServer()->getWorldManager()->getWorldByName($world_name);
+			$world = $this->getServer()->getLevelByName($world_name);
 			if($world !== null){
 				$int_args = [];
 				foreach($args as $arg){
@@ -88,7 +96,7 @@ final class Loader extends PluginBase{
 
 				if(count($int_args) >= 4){
 					[$minx, $minz, $maxx, $maxz] = $int_args;
-					$population_queue_size = $int_args[4] ?? (int) $this->getServer()->getConfigGroup()->getProperty("chunk-generation.population-queue-size", 2);
+					$population_queue_size = $int_args[4] ?? $this->getServer()->getProperty("chunk-generation.population-queue-size", 2);;
 					if($minx <= $maxx){
 						if($minz <= $maxz){
 							$this->generateChunks($world, $minx, $minz, $maxx, $maxz, $population_queue_size);

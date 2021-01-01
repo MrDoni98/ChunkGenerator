@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace muqsit\chunkgenerator;
 
 use Closure;
+use pocketmine\level\Level;
+use pocketmine\level\Position;
 use pocketmine\math\Vector3;
-use pocketmine\world\ChunkListener;
-use pocketmine\world\ChunkLoader;
-use pocketmine\world\format\Chunk;
+use pocketmine\level\ChunkLoader;
+use pocketmine\level\format\Chunk;
 
-final class ChunkGenerator implements ChunkLoader, ChunkListener{
+final class ChunkGenerator implements ChunkLoader{
 
 	/** @var int */
 	private $chunkX;
@@ -23,12 +24,17 @@ final class ChunkGenerator implements ChunkLoader, ChunkListener{
 
 	/** @var Closure */
 	private $on_populate;
+	/** @var Level */
+	private $level;
+	private $loaderId = 0;
 
-	public function __construct(int $chunkX, int $chunkZ, Closure $populate, Closure $on_populate){
+	public function __construct(Level $level, int $chunkX, int $chunkZ, Closure $populate, Closure $on_populate){
+		$this->level = $level;
 		$this->chunkX = $chunkX;
 		$this->chunkZ = $chunkZ;
 		$this->populate = $populate;
 		$this->on_populate = $on_populate;
+		$this->loaderId = Level::generateChunkLoaderId($this);
 	}
 
 	public function getX() : int{
@@ -58,5 +64,38 @@ final class ChunkGenerator implements ChunkLoader, ChunkListener{
 	}
 
 	public function onBlockChanged(Vector3 $block) : void{
+	}
+
+	/**
+	 * Returns the ChunkLoader id.
+	 * Call Level::generateChunkLoaderId($this) to generate and save it
+	 */
+	public function getLoaderId(): int
+	{
+		return $this->loaderId;
+	}
+
+	/**
+	 * Returns if the chunk loader is currently active
+	 */
+	public function isLoaderActive(): bool
+	{
+		// TODO: Implement isLoaderActive() method.
+	}
+
+	/**
+	 * @return Position
+	 */
+	public function getPosition()
+	{
+		// TODO: Implement getPosition() method.
+	}
+
+	/**
+	 * @return Level
+	 */
+	public function getLevel()
+	{
+		return $this->level;
 	}
 }
